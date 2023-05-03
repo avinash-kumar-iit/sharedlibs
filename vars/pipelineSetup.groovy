@@ -1,100 +1,222 @@
-def maven(Map config) {
-         withCredentials([usernamePassword(credentialsId: 'artifactory_id', passwordVariable: 'password', usernameVariable: 'user')]){
-                  bat "echo env.JAVA_HOME"
-                  //env.JAVA_HOME = (config["javaHome"]==null) ? "${home}" : config["javaHome"]
-                  bat "echo ${user}"
-                  //env.JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-17.0.5.0.8-2.el8_6.x86_64"
-                   if (config["javaHome"]==null || config["javaHome"]== "" ) { 
-                               //If the condition is true print the following statement 
-                               println("The value is less than 100"); 
-                               }
-                  else{
-                           env.JAVA_HOME = config["javaHome"]
-                           println("The value is less than 200"); 
-                      }
-                  bat "echo ${PATH}"
-                  //env.MAVEN_HOME = config["mavenHome"]
-                  env.MAVEN_HOME = "/usr/share/maven"
-                  bat "echo ${PATH}"
-                  bat "mvn --version"
-                  //server = Artifactory.server 'Artifactory'
-                 def server = Artifactory.newServer url: 'https://demohdfc123.jfrog.io/artifactory', username: "${user}", password: "${password}"
-                 server.connection.timeout = 300
-                 server.bypassProxy = true
-                 //server.credentialsId = 'jFrogID'
-                 //def server = Artifactory.server "${env.Artifactory}"
-                 def buildInfo = Artifactory.newBuildInfo()
-                 buildInfo.env.capture = true
-                 def rtMaven = Artifactory.newMavenBuild()
-                 //mvnReleaseRepo = "emvs-maven-release-virtual"
-                 //mvnSnapshotRepo = "emvs-maven-snapshot-virtual"
-                 mvnReleaseRepo = config['mavenReleaseRepo']
-                 mvnSnapshotRepo = config['mavenSnapshotRepo']
+   /*
+    * @param config - map of properties read in from .env
+    * @return paramList - list of parameters defined in .env
+    */
+def getPipelineParameters(Map config, Map additionalParams=[:]) {
+    def final PARAMETER_LIST_STRING="customParameterList"
+    def final PARAMETER_DEFAULT_VALUE_STRING="parameterDefaultValue_"
+    def final PARAMETER_DESCRIPTION_STRING="parameterDescription_"
 
-                  
+    def defaultParametersMap = [ 
+        "UPSTREAM_IMAGE_TAG" : [
+            "defaultValue" : "latest",
+            "description" : "The docker image tag (version) for the upstream image"
+        ],
+        "UPSTREAM_IMAGE_BRANCH" : [
+            "defaultValue" : "develop",
+            "description" : "The branch name that the upstream docker image comes from"
+        ]
+    ]
 
-                 pipelineLogger.debug("Artifactory Maven repo : ${mvnReleaseRepo} : ${mvnSnapshotRepo}")
-                 /*path = env.WORKSPACE+'/target'
-                           dir (path){
-                                  sh "ls -l"
-                           }*/
+    pipelineLogger.debug("Creating Parameters for build job.  Note if parameters have been modified (added/removed/default value changed), they will be available in the next build.")
+    def paramNameList = []
+    def paramList = []
 
-                 rtMaven.resolver releaseRepo: mvnReleaseRepo, snapshotRepo: mvnSnapshotRepo, server: server
-                 rtMaven.deployer releaseRepo: mvnReleaseRepo, snapshotRepo: mvnSnapshotRepo, server: server
-                 rtMaven.deployer.deployArtifacts = true
-                 //if (config['includePattern'] != ""){
-                   //  rtMaven.deployer.artifactDeploymentPatterns.addInclude(config['includePattern'].toString())
-                 //}
-                 //if (config['excludePattern'] != ""){
-                   //  rtMaven.deployer.artifactDeploymentPatterns.addExclude(config['excludePattern'].toString())
-                 //}
-                 def pomPath = env.WORKSPACE
-                 //buildInfo = rtMaven.run pom: 'pom.xml', goals: 'clean install'
-                 rtMaven.run pom: 'pom.xml', goals: config['compileArgs'], buildInfo: buildInfo
-                 server.publishBuildInfo buildInfo
-                 pipelineLogger.info("Maven Build completed sucessfully")
+    if (config.containsKey(PARAMETER_LIST_STRING)) {
+        def paramString = config[PARAMETER_LIST_STRING]
+        //paramNameList = paramString.replaceAll("[\"\\\\]","").replaceAll("[,]"," ").split()
+        paramNameList = paramString.replaceAll("[\"\\\\]","").split(",")
 
-        
+    }
+
+    //Read any custom parameters out of .env, if defined
+    if (paramNameList.size() != 0) {
+        pipelineLogger.debug("${PARAMETER_LIST_STRING} found in .env file, indicating custom parameters defined.  Attempting to parse the values")
+        for (paramName in paramNameList){
+            if (defaultParametersMap.containsKey(paramName)) {
+                defaultParametersMap.remove(paramName)
+            }
+
+            def paramDefaultValue = config["${PARAMETER_DEFAULT_VALUE_STRING}${paramName}"]
+            if (paramDefaultValue == null){
+                paramDefaultValue = ""
+            }
+            def paramDescription = config["${PARAMETER_DESCRIPTION_STRING}${paramName}"]
+            if (paramDescription == null){
+                paramDescription = ""
+            }
+            pipelineLogger.debug("Found parameter '${paramName}' with default value '${paramDefaultValue}' and description '${paramDescription}'")
+            def param = string(name: paramName, defaultValue: paramDefaultValue, description: paramDescription, trim: true)
+            paramList.add(param)
+        }
+    }
+
+    //Check whether any of the default parameters have been overridden
+    for (paramName in defaultParametersMap.keySet()) {
+        def paramDefaultValue = defaultParametersMap[paramName]["defaultValue"]
+        def overrideDefaultValue=config["${PARAMETER_DEFAULT_VALUE_STRING}${paramName}"]
+        if (overrideDefaultValue != null && overrideDefaultValue != "" ){
+            pipelineLogger.debug("Found override for ${paramName} - default value set to ${overrideDefaultValue}")
+            paramDefaultValue = overrideDefaultValue
+        }
+        def paramDescription = defaultParametersMap[paramName]["description"]
+        def overrideDefaultDescription=config["${PARAMETER_DESCRIPTION_STRING}${paramName}"]
+        if (overrideDefaultDescription != null && overrideDefaultDescription != ""){
+            pipelineLogger.debug("Found override for ${paramDescription} - default value set to ${overrideDefaultDescription}")
+            paramDescription = overrideDefaultDescription
+        }  
+        def param = string(name: paramName, defaultValue: paramDefaultValue, description: paramDescription, trim: true)
+        paramList.add(param)
+        pipelineLogger.debug("Adding parameter: name:'${paramName}', defaultValue:'${paramDefaultValue}', description:'${paramDescription}'")
+    }
+
+    for (paramName in additionalParams.keySet()){
+        Map paramMap=additionalParams[paramName]
+        String paramDefaultValue=paramMap["defaultValue"]
+        String paramDescription=paramMap["description"]
+        def param = string(name: paramName, defaultValue: paramDefaultValue, description: paramDescription, trim: true)
+        paramList.add(param)
+        pipelineLogger.debug("Adding parameter: name:'${paramName}', defaultValue:'${paramDefaultValue}', description:'${paramDescription}'")
+
+    }
+     
+
+    assert paramList.size() > 0 : "FATAL: No pipeline parameters have been defined, including defaults.  This will cause pipeline to enter failed state.  Pipeline will terminate now."
+    return paramList
 }
+   
+ /**
+    * Adding a function to fetch the production branch name from folder properties defined in jenkins configuration
+    */
+def setFolderProperties(Map config) 
+{
+	withFolderProperties  {
+		if ( env.releaseBranch ) {
+			config["releaseBranch"] = env.releaseBranch
+        }
+        else {
+            if (config["releaseBranch"] == null ) {
+                config.put("releaseBranch", "master")
+            }
+        }
+    }
 }
-def gradle(Map config) {
-         withCredentials([usernamePassword(credentialsId: 'artifactory_id', passwordVariable: 'password', usernameVariable: 'user')]){
 
 
-                  bat "/opt/gradle-7.6/bin/gradle -v"
-                  bat "echo ${user}"
-                  bat "java -version"
-                  bat "echo ${JAVA_HOME}"
-                  bat "echo ${PATH}"
-                  bat "gradle -v"
-                  def server = Artifactory.newServer url: 'https://demohdfc123.jfrog.io/artifactory', username: "${user}", password: "${password}"
-                 server.connection.timeout = 300
-                 server.bypassProxy = true
-                 def buildInfo = Artifactory.newBuildInfo()
-                 buildInfo.env.capture = true
-                 def rtGradle = Artifactory.newGradleBuild()
-                 grdlReleaseRepo = "prarambh-gradle-snapshot-local"
-                 grdlSnapshotRepo = "prarambh-gradle-remote"
-                 pipelineLogger.debug("Artifactory Maven repo : ${grdlReleaseRepo} : ${grdlSnapshotRepo}")
-                 rtGradle.resolver server: server, repo: 'UPI_ISSUER_Gradle_virtual'
-                 rtGradle.deployer server: server, repo: 'UPI_ISSUER_Gradle_virtual'
+  
+def setPipelineLogLevel(Map config){
 
-                 rtGradle.deployer.deployArtifacts = true
-                  //sh "pwd; ls -l"
-                 // sh "sudo chmod -R 777 ./ "
-                 //rtGradle.deployer.deployMavenDescriptors = true
-                 //rtGradle.deployer.mavenCompatible = true
-                 //rtGradle.useWrapper = true
-                 //rtGradle.usesPlugin = true
-                 rtGradle.tool = 'Gradle-7.6'
-                 pipelineLogger.debug("Now starting Build Process")
-                 bat "echo env.GRADLE_HOME"
-                 rtGradle.run rootDir: '/opt/jnlp_jenkins_agent/JNLP/71d6017a/workspace/SUER_Adaptor-common_jfrog-gradle/', buildFile: 'build.gradle', tasks: 'clean artifactoryPublish'
-                 
-      
-                 //server.publishBuildInfo buildInfo
-                 pipelineLogger.info("Gradle Build completed sucessfully")
+    def logLevel=null
+    if ( config["logLevel"] != null && config["logLevel"] != "") {
+        logLevel=config["logLevel"]
+    }
+    withFolderProperties  {
+        if ( env.PIPELINE_LOG_LEVEL != null && env.PIPELINE_LOG_LEVEL != "") {
+            logLevel=env.PIPELINE_LOG_LEVEL
+        }
+    }    
+    println("setPipelineLogLevel(${logLevel})")
 
-        //build.gradle', buildFile: 'build.gradle' /opt/jnlp_jenkins_agent/JNLP/53ad9a5b/workspace/I_ISSUER_Adptor-common_cicd-test
+    pipelineLogger.setLogLevel(logLevel)
 }
+  
+def calculateAndSetPipelineTypeEnvVar(Map config) {
+    def final PIPELINE_TYPES=[ "compile", "deploy"]
+    def final DEPLOY_TYPE_PIPELINE_REGEX = ~/.*((\/(deploy|config)-)|(-(deploy|config)\/)).*/
+    // config-*
+    // deploy-*
+    // *-config
+    // *-deploy
+    def pipelineType = config["pipelineType"]
+    if (pipelineType == null || pipelineType == ""){
+        //pipelineType not set in .env, need to calculate from Job Name
+        if (env.JOB_NAME ==~ DEPLOY_TYPE_PIPELINE_REGEX) {
+            pipelineType="deploy"
+        }
+        else {
+            pipelineType="compile"
+        }
+    }
+    else {
+        assert PIPELINE_TYPES.contains(pipelineType): "ERROR: Pipeline type: ${pipelineType} is not valid. Options are ${PIPELINE_TYPES}"
+    }
+    env.pipelineType=pipelineType
+    pipelineLogger.info("Running Setup and setting up pipelinetype")
+	pipelineLogger.info("Pipeline decided as: ${pipelineType}")	
+}
+
+def setProductionBranchEnvVar(Map config) {
+
+    def pipelineType=env.pipelineType
+    def branchName=env.gitBranchName
+
+    def isProduction=false
+
+    if ( pipelineType == "compile" && config["releaseBranch"] == branchName ){
+            isProduction=true
+    }
+    else if ( pipelineType == "deploy") {
+        def PROD_DEPLOY_BRANCH_REGEX = ~/((e3|c3)-).*/
+        if ( branchName ==~ PROD_DEPLOY_BRANCH_REGEX ){
+            isProduction=true
+        }
+    }
+    env.isProduction=isProduction
+}
+
+def findAndReadConfig(Map externalConfig = [:]) {
+    def config = [:]
+    def additionalConfig=[:]
+
+    if (fileExists('CICD/.env')){
+        config = getConfigMap('CICD/.env')
+    }
+    else if (fileExists('.env')) {
+        config = getConfigMap('.env')
+    }
+
+    pipelineLogger.info("Checking for branch specific .env files")
+
+   
+    //Additional config (i.e. branch specific config) will overwrite any values set in general config
+    config = config + additionalConfig + externalConfig
+    pipelineLogger.debug("273------------Config=${config}")
+
+    return config
+}
+
+def getConfigMap(String filePath) {
+    pipelineLogger("Reading properties file from '${filePath}'")
+    def config = readProperties interpolate: true, file: filePath;
+    return config
+}
+
+def call(boolean customParam = false, Map externalConfig = [:]) {
+    pipelineLogger.info("Running Setup")
+    utilGit.setEnvVarsFromGitProperties()
+    def config = findAndReadConfig(externalConfig)
+    setFolderProperties(config)
+    assert ! config.isEmpty():"ERROR: No .env file(s) or custom Pipeline scripts detected"
+
+    setPipelineLogLevel(config)
+    calculateAndSetPipelineTypeEnvVar(config)
+    setProductionBranchEnvVar(config)
+   
+    String customRegistry = (config['customRegistry'] == null) ? "${customParam}":config['customRegistry']
+    if (customRegistry == null || customRegistry.toBoolean() )
+    {
+         def pipelineParametersList = getPipelineParameters(config)
+         utilities.setPipelineProperties(pipelineParametersList, config)
+    }
+    
+
+    utilCalculateTag(config)
+    /**
+     * Print environment variables
+     */
+    env.gitProjectName = config['projectName']
+    String fullEnvVars = sh(script: "printenv | sort", returnStdout: true)
+  	pipelineLogger.debug("343---------Full list of environment variables set: \n${fullEnvVars}")    
+  
+    return config
 }
