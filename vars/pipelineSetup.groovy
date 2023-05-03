@@ -96,7 +96,7 @@ def setFolderProperties(Map config)
         }
         else {
             if (config["releaseBranch"] == null ) {
-                config.put("releaseBranch", "master")
+                config.put("releaseBranch", "main")
             }
         }
     }
