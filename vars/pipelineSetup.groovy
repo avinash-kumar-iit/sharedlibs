@@ -210,7 +210,7 @@ def call(boolean customParam = false, Map externalConfig = [:]) {
     }
     
 
-    utilCalculateTag(config)
+    //utilCalculateTag(config)
     /**
      * Print environment variables
      */
