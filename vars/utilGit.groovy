@@ -24,7 +24,7 @@ def setEnvVarsFromGitProperties() {
     System.out.println("git urel---->" + env.gitUrl)
     env.gitRepoName = gitUrl.tokenize('/').last().split("\\.")[0]
 	env.gitProjectName = "emvs"
-    env.gitBranchName = env.BRANCH_NAME.split("/").last()
+    //env.gitBranchName = env.BRANCH_NAME.split("/").last()
     if (isUnix()){
         env.gitCommitHash = bat(script: "git log -n 1 --pretty=format:'%H'", returnStdout: true)
         env.gitCommitHashShort = bat(script: "git log -n 1 --pretty=format:'%h'", returnStdout: true)
