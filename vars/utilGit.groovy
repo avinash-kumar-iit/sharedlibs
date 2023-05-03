@@ -21,7 +21,7 @@ def setEnvVarsFromGitProperties() {
     env.gitUrl = scm.getUserRemoteConfigs()[0].getUrl()-"https://"
      //NEED TO SET THIS AS PER BANK
     //*********env.gitProjectName = gitUrl.split("github.com/")[1].split("/")[0].toLowerCase()************
-    
+    System.out.println("git urel---->" + env.gitUrl)
     env.gitRepoName = gitUrl.tokenize('/').last().split("\\.")[0]
 	env.gitProjectName = "emvs"
     env.gitBranchName = env.BRANCH_NAME.split("/").last()
