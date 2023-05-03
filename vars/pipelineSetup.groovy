@@ -215,7 +215,7 @@ def call(boolean customParam = false, Map externalConfig = [:]) {
      * Print environment variables
      */
     env.gitProjectName = config['projectName']
-    String fullEnvVars = sh(script: "printenv | sort", returnStdout: true)
+    String fullEnvVars = bat(script: "printenv | sort", returnStdout: true)
   	pipelineLogger.debug("343---------Full list of environment variables set: \n${fullEnvVars}")    
   
     return config
