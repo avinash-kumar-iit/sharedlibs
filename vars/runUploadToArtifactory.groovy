@@ -1,5 +1,5 @@
 def maven(Map config) {
-         withCredentials([usernamePassword(credentialsId: 'artifactory_id', passwordVariable: 'password', usernameVariable: 'user')]){
+         withCredentials([usernamePassword(credentialsId: 'jenkins', passwordVariable: 'password', usernameVariable: 'user')]){
                   bat "echo env.JAVA_HOME"
                   //env.JAVA_HOME = (config["javaHome"]==null) ? "${home}" : config["javaHome"]
                   bat "echo ${user}"
