@@ -3,7 +3,7 @@ def maven(Map config) {
                   bat "echo env.JAVA_HOME"
                   //env.JAVA_HOME = (config["javaHome"]==null) ? "${home}" : config["javaHome"]
                   bat "echo ${user}"
-                  //env.JAVA_HOME = "/usr/lib/jvm/java-17-openjdk-17.0.5.0.8-2.el8_6.x86_64"
+                  env.JAVA_HOME = "jdk-11.0.16.8-hotspot"
                    if (config["javaHome"]==null || config["javaHome"]== "" ) { 
                                //If the condition is true print the following statement 
                                println("The value is less than 100"); 
