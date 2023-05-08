@@ -18,9 +18,11 @@ def maven(Map config) {
                   bat "echo ${PATH}"
                   bat "mvn --version"
                   //server = Artifactory.server 'Artifactory'
-                 def server = Artifactory.newServer url: 'https://demohdfc123.jfrog.io/artifactory', username: "${user}", password: "${password}"
+                // def server = Artifactory.newServer url: 'https://demohdfc123.jfrog.io/artifactory', username: "${user}", password: "${password}"
+                 def server = Artifactory.newServer 'https://demohdfc123.jfrog.io/artifactory', username: "${user}", password: "${password}"
                  server.connection.timeout = 300
                  server.bypassProxy = true
+                  println("connection-------------->> 100"); 
                  //server.credentialsId = 'jFrogID'
                  //def server = Artifactory.server "${env.Artifactory}"
                  def buildInfo = Artifactory.newBuildInfo()
