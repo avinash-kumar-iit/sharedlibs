@@ -17,7 +17,6 @@ def maven(Map config) {
                   env.MAVEN_HOME = "/usr/share/maven"
                   bat "echo ${PATH}"
                   bat "mvn --version"
-                   bat "mvn clean install"
                   //server = Artifactory.server 'Artifactory'
                  def server = Artifactory.newServer url: 'https://demohdfc123.jfrog.io/artifactory', username: "${user}", password: "${password}"
                  server.connection.timeout = 300
@@ -50,7 +49,7 @@ def maven(Map config) {
                    //  rtMaven.deployer.artifactDeploymentPatterns.addExclude(config['excludePattern'].toString())
                  //}
                  def pomPath = env.WORKSPACE
-                 //buildInfo = rtMaven.run pom: 'pom.xml', goals: 'clean install'
+                 buildInfo = rtMaven.run pom: 'pom.xml', goals: 'clean install'
                  rtMaven.run pom: 'pom.xml', goals: config['compileArgs'], buildInfo: buildInfo
                  server.publishBuildInfo buildInfo
                  pipelineLogger.info("Maven Build completed sucessfully")
