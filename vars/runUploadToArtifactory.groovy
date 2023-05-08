@@ -14,7 +14,7 @@ def maven(Map config) {
                       }
                   bat "echo ${PATH}"
                   //env.MAVEN_HOME = config["mavenHome"]
-                  env.MAVEN_HOME = "/usr/share/maven"
+                  env.MAVEN_HOME = "maven"
                   bat "echo ${PATH}"
                   bat "mvn --version"
                   //server = Artifactory.server 'Artifactory'
