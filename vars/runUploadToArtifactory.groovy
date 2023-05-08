@@ -17,6 +17,7 @@ def maven(Map config) {
                   env.MAVEN_HOME = "/usr/share/maven"
                   bat "echo ${PATH}"
                   bat "mvn --version"
+                   bat "mvn clean install"
                   //server = Artifactory.server 'Artifactory'
                  def server = Artifactory.newServer url: 'https://demohdfc123.jfrog.io/artifactory', username: "${user}", password: "${password}"
                  server.connection.timeout = 300
